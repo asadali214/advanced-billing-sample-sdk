@@ -1,0 +1,22 @@
+using System.Text.Json.Serialization;
+
+namespace MaxioAdvancedBilling.Models;
+
+public record InvoiceTaxBreakout
+{
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [JsonPropertyName("uid")]
+    public string? Uid { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [JsonPropertyName("taxable_amount")]
+    public string? TaxableAmount { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [JsonPropertyName("tax_amount")]
+    public string? TaxAmount { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [JsonPropertyName("tax_exempt_amount")]
+    public string? TaxExemptAmount { get; init; }
+}
