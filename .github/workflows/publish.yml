@@ -1,8 +1,14 @@
 name: Publish to NuGet
 
-# Publishes the package when a GitHub Release is published.
-# The release tag is used as the package version (a leading "v" is stripped),
-# so tagging "v1.0.0" publishes version 1.0.0.
+# Publishes the package to NuGet, then (for manual runs) tags the commit and
+# creates a GitHub Release with auto-generated notes once the push succeeds.
+#
+# Two ways to run:
+#   * Manually (workflow_dispatch): provide a version (e.g. 1.0.0). On a
+#     successful NuGet push, this creates tag "v<version>" and a GitHub Release
+#     with generated notes, attaching the .nupkg as a release asset.
+#   * On a published GitHub Release: the release tag is used as the version and
+#     the package is published. No new tag/release is created (it already exists).
 #
 # Prerequisite: add a repository secret named NUGET_API_KEY
 # (Settings -> Secrets and variables -> Actions -> New repository secret).
@@ -16,6 +22,10 @@ on:
         description: "Package version to publish (e.g. 1.0.0)"
         required: true
         default: "1.0.0"
+
+# Needed so the workflow can create tags and releases.
+permissions:
+  contents: write
 
 jobs:
   publish:
@@ -56,3 +66,22 @@ jobs:
           --api-key "${{ secrets.NUGET_API_KEY }}"
           --source https://api.nuget.org/v3/index.json
           --skip-duplicate
+
+      # Runs only for manual runs and only if every previous step succeeded
+      # (including the NuGet push). For release-triggered runs the tag/release
+      # already exist, so this is skipped to avoid creating a duplicate.
+      - name: Tag and create GitHub Release
+        if: ${{ success() && github.event_name == 'workflow_dispatch' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="v${{ steps.version.outputs.value }}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists; skipping."
+          else
+            gh release create "$TAG" \
+              ./artifacts/*.nupkg \
+              --title "$TAG" \
+              --target "${{ github.sha }}" \
+              --generate-notes
+          fi
