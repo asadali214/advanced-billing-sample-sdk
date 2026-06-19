@@ -1,5 +1,4 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using MaxioAdvancedBilling.Core.Models;
@@ -23,14 +22,10 @@ internal sealed class TemplateParamsFactory
     {
         foreach (var (key, value) in parameters)
         {
-            var replacement = value is IEnumerable enumerable and not string
-                ? string.Join("/", enumerable.Cast<object?>().Select(Encode))
-                : Encode(value);
+            var replacement = string.Join(",", ParameterFlattener.Flatten(value).Select(Uri.EscapeDataString));
             template = template.Replace($"{{{key}}}", replacement);
         }
 
         return template;
-
-        static string Encode(object? v) => Uri.EscapeDataString(v?.ToString() ?? string.Empty);
     }
 }
