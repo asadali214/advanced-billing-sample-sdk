@@ -1,7 +1,8 @@
 name: Publish to NuGet
 
-# Publishes the package to NuGet, then (for manual runs) tags the commit and
-# creates a GitHub Release with auto-generated notes once the push succeeds.
+# Publishes the package to NuGet using Trusted Publishing (OIDC) — no long-lived
+# API key required. On manual runs it also tags the commit and creates a GitHub
+# Release with auto-generated notes once the push succeeds.
 #
 # Two ways to run:
 #   * Manually (workflow_dispatch): provide a version (e.g. 1.0.0). On a
@@ -10,8 +11,14 @@ name: Publish to NuGet
 #   * On a published GitHub Release: the release tag is used as the version and
 #     the package is published. No new tag/release is created (it already exists).
 #
-# Prerequisite: add a repository secret named NUGET_API_KEY
-# (Settings -> Secrets and variables -> Actions -> New repository secret).
+# Prerequisites (one-time):
+#   1. On nuget.org -> your username -> Trusted Publishing, add a policy:
+#        Repository Owner: asadali214
+#        Repository:       advanced-billing-sample-sdk
+#        Workflow File:    publish.yml
+#        Environment:      (leave empty)
+#   2. Add a repository secret NUGET_USER with your nuget.org username
+#      (profile name, NOT your email).
 
 on:
   release:
@@ -23,9 +30,11 @@ on:
         required: true
         default: "1.0.0"
 
-# Needed so the workflow can create tags and releases.
+# contents: write -> create tags and releases
+# id-token: write -> request the GitHub OIDC token for Trusted Publishing
 permissions:
   contents: write
+  id-token: write
 
 jobs:
   publish:
@@ -60,10 +69,18 @@ jobs:
           -o ./artifacts
           -p:Version=${{ steps.version.outputs.value }}
 
+      # Exchange the GitHub OIDC token for a short-lived nuget.org API key.
+      # Valid for ~1 hour, so this runs immediately before the push.
+      - name: NuGet login (OIDC -> temp API key)
+        uses: NuGet/login@v1
+        id: login
+        with:
+          user: ${{ secrets.NUGET_USER }}
+
       - name: Push to NuGet
         run: >
           dotnet nuget push "./artifacts/*.nupkg"
-          --api-key "${{ secrets.NUGET_API_KEY }}"
+          --api-key "${{ steps.login.outputs.NUGET_API_KEY }}"
           --source https://api.nuget.org/v3/index.json
           --skip-duplicate
 
